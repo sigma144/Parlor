@@ -1,0 +1,23 @@
+
+body {
+    background-color: #303030;
+}
+
+h1 {
+    background-color: white;
+    border: solid black 15px;
+    width: 550px;
+    height: 135px;
+    text-align: center;
+    font-family: sans-serif;
+    font-size: 40px;
+}
+
+.size2 {
+    font-size: 30px;
+}
+
+
+.size3 {
+    font-size: 20px;
+}
