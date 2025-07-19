@@ -28,14 +28,20 @@ function displayPuzzle(puzzle) {
     for (let s of puzzle.statements) {
         let box = s.currentBox
         let el = document.getElementById("box" + (box + 1))
-        el.innerHTML = s.text;
-        if (s.text.length > 58) {
-            el.className = "size2"
+        if (el.innerHTML) {
+            el.innerHTML += "<br>                           <br>" + s.text
         }
+        else el.innerHTML = s.text;
+        if (el.innerHTML.length > 58)
+            el.className = "size2"
+        if (el.innerHTML.length > 95)
+            el.className = "size3"
+        if (el.innerHTML.length > 150)
+            el.className = "size4"
     }
 }
 
-function generate(numBoxes=3, numStatements=null, duplicate=null, gemsInDuplicateBox=false) {
+function generate(numBoxes=3, numStatements=4, duplicate=null, gemsInDuplicateBox=false) {
     //if (duplicate === null && randInt(10) == 0) {
     //    duplicate = true
     //    gemsInDuplicateBox = randInt(2)
@@ -47,12 +53,14 @@ function generate(numBoxes=3, numStatements=null, duplicate=null, gemsInDuplicat
     }
     while(true) {
         let statements = []
-        let locations = []
+        locations = {}
+        for (let b = 0; b < numBoxes; b++)
+            locations[b] = 0
         while (statements.length < numStatements) {
             let b = randInt(numBoxes)
-            if (locations.includes(b)) continue
+            if (locations[b] == 2) continue
+            locations[b] += 1
             statements.push(getRandomStatement(b, numBoxes))
-            locations.push(b)
         }
         let swapPoint = numStatements - 1
         let swapBox = statements[swapPoint].currentBox
@@ -97,6 +105,16 @@ function solve(puzzle, full=true) {
 }
 
 function isLogicallyValid(statements, gems, boxes) {
+    let onlyTrue = false
+    let onlyFalse = false
+    for (let b of boxes) {
+        if (b.length == 1 && b[0].value || b.length == 2 && b[0].value && b[1].value)
+            onlyTrue = true
+        else if (b.length == 1 && !b[0].value || b.length == 2 && !b[0].value && !b[1].value)
+            onlyFalse = true
+    }
+    if (!onlyTrue || !onlyFalse)
+        return false
     for (let s of statements) {
         if (s.evaluate(statements, gems, boxes) != s.value) {
             return false
@@ -124,7 +142,7 @@ function isValidPuzzle(puzzle) {
 
 function canMetagame(statements) {
     let boxes = new Set()
-    for (const stmt of statements) {
+    for (let stmt of statements) {
         let box = stmt.boxHasGems
         if (stmt.word) {
             let words = []
@@ -210,7 +228,7 @@ function _getRandomStatement(currentBox, numBoxes) {
         case 4: return new StmtGemsInT(truth, variant)
         case 5: return new StmtGemsInAllT(truth, variant)
         case 6: return new StmtOthersAreT(truth, currentBox, variant)
-        case 7: return new StmtTwoT(truth)
+        case 7: return new StmtCountT(truth, variant)
         case 8:
             if (box == box2) box2 = (box2 + 1 + randInt(2)) % 3
             return new StmtSImpliesT(currentBox, box, box2, truth)
@@ -219,9 +237,20 @@ function _getRandomStatement(currentBox, numBoxes) {
             return new StmtSEqualsT(currentBox, box, box2, truth)
         case 10: return new StmtGemsInW(truth, word)
         case 11: return new StmtWIsT(truth, word, variant3)
-        case 12: return new StmtTIsW(truth, word ,variant4)
+        case 12: return new StmtTIsW(truth, word, variant4)
     }
 }
+
+function _getRandomStatementNew(currentBox, numBoxes) {
+    objects = []
+}
+
+
+
+
+
+
+
 
 COLORS = ["BLUE", "WHITE", "BLACK", "RED"]
 TRUTH = ["FALSE", "TRUE"]
@@ -256,8 +285,8 @@ class StmtTrue {
         this.text = ["THIS IS NOT A STATEMENT.",
         "THIS STATEMENT IS MEANINGLESS.",
         "THIS IS THE ONLY EMPTY BOX.",
-        "ALL OF THE OTHER STATEMENTS ARE EXACTLY AS TRUE AS THIS ONE.", 
-        "NONE OF THE OTHER STATEMENTS ARE OPPOSITELY AS TRUE AS THIS STATEMENT."
+        "ALL OF THE OTHER BOXES CONTAIN GEMS.",
+        "ALL OF THE OTHER STATEMENTS ARE EXACTLY AS TRUE AS THIS STATEMENT.", 
         ][randInt(5)]
     }
   }
@@ -283,7 +312,7 @@ class StmtGemsInX {
     }
     if (currentBox == targetBox && randInt(2) == 0) {
         if (truth) this.text = "ALL OF THE OTHER BOXES ARE EMPTY."
-        else this.text = "EXACTLY ONE OF THE OTHER BOXES IS EMPTY." //TODO: Fix for larger numbers
+        else this.text = "ONLY ONE OF THE OTHER BOXES IS EMPTY." //TODO: Fix for larger box numbers
     }
   }
   evaluate(statements, gems) {
@@ -322,8 +351,6 @@ class StmtGemsInAllT {
         if (variant)
             this.text = ["AT LEAST ONE BOX WITH A " + TRUTH[truth] + " STATEMENT IS EMPTY.",
             "AT LEAST ONE EMPTY BOX HAS A " + TRUTH[truth] + " STATEMENT.",
-            //"NOT ALL BOXES WITH A " + TRUTH[truth] + " STATEMENT CONTAIN GEMS.",
-            //"NOT ALL EMPTY BOXES HAVE " + TRUTH[1 - truth] + " STATEMENTS.",
             ][randInt(2)]
         else
             this.text = ["ALL BOXES WITH A " + TRUTH[truth] + " STATEMENT CONTAIN GEMS.",
@@ -333,10 +360,6 @@ class StmtGemsInAllT {
             ][randInt(4)]
   }
   evaluate(statements, gems, boxes) {
-    for (let s of statements) {
-        if (s.value == this.truth && gems != s.currentBox)
-            return this.variant
-    }
     if (this.text == "ALL EMPTY BOXES HAVE " + TRUTH[1 - this.truth] + " STATEMENTS.") { 
         for (let b of boxes) { 
             if (b.length > 1) return !this.value //Phrase is ambiguous when multiple statements are involved
@@ -344,6 +367,10 @@ class StmtGemsInAllT {
         for (let b of boxes) { 
             if (b.length == 0) return false //Must be false when there is a blank box
         }
+    }
+    for (let s of statements) {
+        if (s.value == this.truth && gems != s.currentBox)
+            return this.variant
     }
     return !this.variant
   }
@@ -394,9 +421,7 @@ class StmtOthersAreT {
     constructor(truth, currentBox, variant) {
         this.box = currentBox; this.truth = truth; this.variant = variant
         if (variant)
-            this.text = ["EXACTLY ONE OF THE OTHER STATEMENTS IS " + TRUTH[truth] + ".",
-            "AT LEAST ONE OTHER STATEMENT IS EXACTLY AS TRUE AS THIS STATEMENT.",
-            ][randInt(2)]
+            this.text = "ONLY ONE OF THE OTHER STATEMENTS IS " + TRUTH[truth] + "."
         else
             this.text = "AT LEAST ONE OF THE OTHER STATEMENTS IS " + TRUTH[truth] + "."
     }
@@ -410,10 +435,10 @@ class StmtOthersAreT {
     }
 }
 
-class StmtTwoT { //TODO: Fix for larger numbers
+class StmtCountT {
     constructor(truth, variant) {
         this.truth = truth
-        if (variant) this.text = "THERE ARE TWO " + TRUTH[truth] + " STATEMENTS."
+        if (variant) this.text = "THERE ARE EXACTLY TWO " + TRUTH[truth] + " STATEMENTS."
         else this.text = "THERE IS ONLY ONE " + TRUTH[truth] + " STATEMENT."
     }
     evaluate(statements) {
@@ -490,7 +515,7 @@ class StmtWIsT {
     constructor(truth, word, variant3) {
         this.truth = truth; this.word = word; this.variant = variant3
         if (variant3 == 0)
-            this.text = "EXACTLY ONE STATEMENT WITH THE WORD \"" + word + "\" IS " + TRUTH[truth] + "."
+            this.text = "ONLY ONE STATEMENT WITH THE WORD \"" + word + "\" IS " + TRUTH[truth] + "."
         else if (variant3 == 1)
             this.text = "AT LEAST ONE STATEMENT WITH THE WORD \"" + word + "\" IS " + TRUTH[truth] + "."
         else
@@ -513,7 +538,7 @@ class StmtTIsW {
     constructor(truth, word, variant4) {
         this.truth = truth; this.word = word; this.variant = variant4
         if (variant4 == 0)
-            this.text = "EXACTLY ONE " + TRUTH[truth] + " STATEMENT HAS THE WORD \"" + word + "\"."
+            this.text = "ONLY ONE " + TRUTH[truth] + " STATEMENT HAS THE WORD \"" + word + "\"."
         else if (variant4 == 1)
             this.text = "AT LEAST ONE " + TRUTH[truth] + " STATEMENT HAS THE WORD \"" + word + "\"."
         else if (variant4 == 2)
@@ -530,15 +555,18 @@ class StmtTIsW {
             if (this.variant == 3 && s.text.includes(this.word)) return false
             if (s.text.includes(this.word)) count++
         }
+        if (this.variant == 2 || this.variant == 3) return true
         return this.variant ? count >= 1 : count == 1
     }
 }
 
 
 
-//puzzle = {"statements": [new StmtGemsInX(0, 2, 2), new StmtGemsInT(0)], "numBoxes": 3}
-//puzzle.statements[0].currentBox = 2
-//puzzle.statements[1].currentBox = 1
+//puzzle = {"numBoxes": 3, "statements": [new StmtGemsInAllT(0, 1), new StmtTIsW(1, "BOX", 2), new StmtOthersAreT(1, 1, 1), new StmtGemsInT(1, 0)]}
+//puzzle.statements[0].currentBox = 0
+//puzzle.statements[1].currentBox = 0
+//puzzle.statements[2].currentBox = 1
+//puzzle.statements[3].currentBox = 1
 
 puzzle = generate()
 displayPuzzle(puzzle)
